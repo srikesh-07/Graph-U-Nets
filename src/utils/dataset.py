@@ -21,7 +21,7 @@ class GraphData(object):
 
     def __getitem__(self, idx):
         g = self.data[idx]
-        return g.A, g.feas.float(), g.label
+        return g.A, g.feas.float(), g.label, g.nodegroup
 
     def __iter__(self):
         return self
@@ -34,8 +34,8 @@ class GraphData(object):
         cur_idx = self.idx[self.pos: self.pos+self.batch]
         data = [self.__getitem__(idx) for idx in cur_idx]
         self.pos += len(cur_idx)
-        gs, hs, labels = map(list, zip(*data))
-        return len(gs), gs, hs, torch.LongTensor(labels)
+        gs, hs, labels, nodegroup = map(list, zip(*data))
+        return len(gs), gs, hs, torch.LongTensor(labels), nodegroup
 
     def loader(self, batch, shuffle, *args):
         self.batch = batch

@@ -1,3 +1,5 @@
+import random
+
 import torch
 from tqdm import tqdm
 import networkx as nx
@@ -12,18 +14,20 @@ class G_data(object):
         self.num_class = num_class
         self.feat_dim = feat_dim
         self.g_list = g_list
+        self.fold_idx = 1
         self.sep_data()
 
     def sep_data(self, seed=0):
-        skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
-        labels = [g.label for g in self.g_list]
-        self.idx_list = list(skf.split(np.zeros(len(labels)), labels))
+        random.shuffle(self.g_list)
+        # skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+        # labels = [g.label for g in self.g_list]
+        # self.idx_list = list(skf.split(np.zeros(len(labels)), labels))
 
     def use_fold_data(self, fold_idx):
-        self.fold_idx = fold_idx+1
-        train_idx, test_idx = self.idx_list[fold_idx]
-        self.train_gs = [self.g_list[i] for i in train_idx]
-        self.test_gs = [self.g_list[i] for i in test_idx]
+        total_graphs = len(self.g_list)
+        self.train_gs = self.g_list[: int(total_graphs * 0.7)]
+        self.val_gs = self.g_list[len(self.train_gs): len(self.train_gs) + int(total_graphs * 0.1)]
+        self.test_gs = self.g_list[len(self.train_gs) + int(total_graphs * 0.1):]
 
 
 class FileLoader(object):
@@ -76,13 +80,35 @@ class FileLoader(object):
         label_dict = {}
         feat_dict = {}
 
+        if args.data == "PROTEINS":
+            K = [0, 371, 742, 1113]
+        elif args.data == "PTC":
+            K = [0, 115, 230, 344]
+        elif args.data == "IMDBBINARY":
+            K = [0, 333, 666, 1000]
+        elif args.data == "DD":
+            K = [0, 393, 785, 1178]
+        elif args.data == "FRANK":
+            K = [0, 1445, 2890, 4337]
+
         with open('data/%s/%s.txt' % (args.data, args.data), 'r') as f:
             lines = f.readlines()
         f = self.line_genor(lines)
         n_g = int(next(f).strip())
+        nodes = torch.zeros(n_g)
         for i in tqdm(range(n_g), desc="Create graph", unit='graphs'):
             g = self.gen_graph(f, i, label_dict, feat_dict, args.deg_as_tag)
+            nodes[i] = g.number_of_nodes()
             g_list.append(g)
+
+        _, ind = torch.sort(nodes, descending=True)
+
+        for i in ind[K[0]:K[1]]:
+            g_list[i].nodegroup = 2
+        for i in ind[K[1]:K[2]]:
+            g_list[i].nodegroup = 1
+        for i in ind[K[2]:K[3]]:
+            g_list[i].nodegroup = 0
 
         tagset = set([])
         for g in g_list:

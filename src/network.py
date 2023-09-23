@@ -18,10 +18,10 @@ class GNet(nn.Module):
         self.out_drop = nn.Dropout(p=args.drop_c)
         Initializer.weights_init(self)
 
-    def forward(self, gs, hs, labels):
+    def forward(self, gs, hs, labels, nodegroup):
         hs = self.embed(gs, hs)
         logits = self.classify(hs)
-        return self.metric(logits, labels)
+        return self.metric(logits, labels, nodegroup)
 
     def embed(self, gs, hs):
         o_hs = []
@@ -53,8 +53,23 @@ class GNet(nn.Module):
         h = self.out_l_2(h)
         return F.log_softmax(h, dim=1)
 
-    def metric(self, logits, labels):
+    def metric(self, logits, labels, nodegroup):
         loss = F.nll_loss(logits, labels)
         _, preds = torch.max(logits, 1)
-        acc = torch.mean((preds == labels).float())
-        return loss, acc
+        correct_all = preds.eq(labels.view_as(
+            preds)).sum().cpu().item()
+        nodegroup = torch.tensor(nodegroup, dtype=torch.long)
+        mask_head = (nodegroup == 2)
+        mask_medium = (nodegroup == 1)
+        mask_tail = (nodegroup == 0)
+        correct_head = preds[mask_head].eq(labels[mask_head].view_as(
+            preds[mask_head])).sum().cpu().item()
+        correct_medium = preds[mask_medium].eq(labels[mask_medium].view_as(
+            preds[mask_medium])).sum().cpu().item()
+        correct_tail = preds[mask_tail].eq(labels[mask_tail].view_as(
+            preds[mask_tail])).sum().cpu().item()
+        return loss, [(correct_all, labels.shape[0]) ,
+                      (correct_head, mask_head.sum().cpu().item()),
+                      (correct_medium, mask_medium.sum().cpu().item()),
+                      (correct_tail, mask_tail.sum().cpu().item()),
+                      ]
