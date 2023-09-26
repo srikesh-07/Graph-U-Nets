@@ -55,7 +55,7 @@ class Trainer:
             # med_accs.append(acc[2] * cur_len)
             # tail_accs.append(acc[3] * cur_len)
             # accs.append(acc*cur_len)
-            n_samples += cur_len
+            # n_samples += cur_len
             if optimizer is not None:
                 optimizer.zero_grad()
                 loss.backward()
